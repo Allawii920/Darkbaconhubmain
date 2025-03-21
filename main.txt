@@ -22,7 +22,7 @@ Fluent:Notify({
 
 
 
-getgenv().Key = "Hello"  -- Correct key
+getgenv().Key = "IlovemyMom"  -- Correct key
 getgenv().KeyInput = ""  -- Initial input value (set to empty string)
 
 function DarkBaconScriptHub()
@@ -78,7 +78,8 @@ Tabs.Main:AddButton({
         end
     end
 })
-Window:SelcetTab(1)
+
+
 Tabs.Main:AddButton({
     Title = "Destroy Script",
     Description = "Only Destroy Key system",
