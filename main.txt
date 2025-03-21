@@ -26,7 +26,7 @@ getgenv().Key = "IlovemyMom"  -- Correct key
 getgenv().KeyInput = ""  -- Initial input value (set to empty string)
 
 function DarkBaconScriptHub()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/Testerr111/Darkbaconhubmain/refs/heads/main/Scripthub/main.txt', true))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/Testerr111/Darkbaconhubmain/refs/heads/main/main.txt', true))()
     end
 
 function CorrectKeyNotification()
