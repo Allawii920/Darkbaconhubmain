@@ -411,6 +411,47 @@ Toggle:OnChanged(function(state)
     end
 end)
 
+local Toggle = Tabs.Misc:AddToggle("MyToggle", { Title = "Auto redeem codes", Default = false })
+
+local isAutoRedeemActive = false  -- A variable to track the state of the auto-redeem
+
+Toggle:OnChanged(function(value)
+    isAutoRedeemActive = value  -- Update the state based on the toggle's value
+
+    if isAutoRedeemActive then
+        -- When the toggle is ON, start redeeming codes
+        for i = 1, 20 do
+            local codes = {
+                "update10", 
+                "update9", 
+                "Update8", 
+                "update7", 
+                "30mvisits", 
+                "20mvisits", 
+                "1mfavorites", 
+                "update4", 
+                "750kfavorites", 
+                "fixes2", 
+                "fixes", 
+                "squid", 
+                "update3", 
+                "5mvisits", 
+                "400kfavorites"
+            }
+            
+            for _, code in ipairs(codes) do
+                local remote = game:GetService("ReplicatedStorage").Remotes:FindFirstChild("Redeem Code")
+                if remote then
+                    remote:InvokeServer(code)  -- Use InvokeServer to send the code to the server
+                end
+            end
+        end
+    end
+end)
+
+
+
+        
 local VirtualUser = game:GetService('VirtualUser')
 local Players = game:GetService("Players")
 local Toggle = Tabs.Misc:AddToggle("MyToggle", { Title = "Auto AFK", Default = false })
@@ -671,3 +712,21 @@ UICorner.Parent = ImageButton
 ImageButton.MouseButton1Down:connect(function()
     game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
 end)
+
+--[[
+update10 
+update9  
+Update8 
+update7 
+30mvisits
+20mvisits  
+1mfavorites
+update4 
+750kfavorites 
+fixes2 
+fixes 
+squid 
+update3  
+5mvisits 
+400kfavorites 
+]]
