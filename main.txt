@@ -22,7 +22,7 @@ Fluent:Notify({
 
 
 
-getgenv().Key = "IlovemyMom"  -- Correct key
+getgenv().Key = "Allawi"  -- Correct key
 getgenv().KeyInput = ""  -- Initial input value (set to empty string)
 
 function DarkBaconScriptHub()
