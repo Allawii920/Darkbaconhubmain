@@ -30,7 +30,7 @@ Tabs.Creds:AddParagraph({
 })
 
 Tabs.Creds:AddButton({
-    Title = "Yt",
+    Title = "Yt channel",
     Description = "Youtube channel",
     Callback = function()
         setclipboard("https://www.youtube.com/@Darkbacon-scripts")
