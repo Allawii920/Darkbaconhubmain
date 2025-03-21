@@ -30,14 +30,14 @@ Tabs.Creds:AddParagraph({
 })
 
 Tabs.Creds:AddButton({
-    Title = "Yt channel",
+    Title = "Copy Yt channel",
     Description = "Youtube channel",
     Callback = function()
         setclipboard("https://www.youtube.com/@Darkbacon-scripts")
     end
 })
 Tabs.Creds:AddButton({
-    Title = "Diacord server",
+    Title = "Copy Discord server",
     Description = "Discord server",
     Callback = function()
         setclipboard("https://discord.gg/GcbAzvW5")
