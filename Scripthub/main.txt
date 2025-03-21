@@ -249,7 +249,7 @@ Dropdown:OnChanged(function(Value)
         selectedRebirth = 1
     elseif Value == "5" then
         selectedRebirth = 2
-    elseif Value == "25" then
+    elseif Value == "20" then
         selectedRebirth = 3
     elseif Value == "50" then
         selectedRebirth = 4
