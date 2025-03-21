@@ -1,3 +1,5 @@
+if game.PlaceId == 111130915266245 then
+
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Player = game.Players.LocalPlayer
@@ -7,7 +9,7 @@ local Window = Fluent:CreateWindow({
     Title = "darkbacon hub | Key System",
     SubTitle = " [ Made by darkbacon ]",
     TabWidth = 160,
-    Size = UDim2.fromOffset(400, 300),
+    Size = UDim2.fromOffset(580, 500),
     Acrylic = false,
     Theme = "Darker",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -52,6 +54,11 @@ local Tabs = {
     Main = Window:AddTab({ Title = "Main", Icon = "home" })
 }
 
+Tabs.Main:AddParagraph({
+        Title = "Info",
+        Content = "Paste the link to your discord to get my key!\nKey are only 24h"
+    })
+
 -- Add Input Field
 local Input = Tabs.Main:AddInput("Input", {
     Title = "Enter Key",
@@ -62,6 +69,14 @@ local Input = Tabs.Main:AddInput("Input", {
     Callback = function(Value)
         -- This is where the input value is updated
         getgenv().KeyInput = Value  -- Directly set the value to KeyInput
+    end
+})
+
+Tabs.Main:AddButton({
+    Title = "Copy Link (discord)",
+    Description = "Paste it to your discord/Browser to join my discord server",
+    Callback = function()
+    setclipboard("https://discord.gg/GcbAzvW5")
     end
 })
 
@@ -79,6 +94,7 @@ Tabs.Main:AddButton({
     end
 })
 
+Window:SelectTab(1)
 
 Tabs.Main:AddButton({
     Title = "Destroy Script",
@@ -87,3 +103,4 @@ Tabs.Main:AddButton({
         Fluent:Destroy()
         end
 })
+end
