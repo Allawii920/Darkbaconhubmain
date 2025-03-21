@@ -36,7 +36,13 @@ Tabs.Creds:AddButton({
         setclipboard("https://www.youtube.com/@Darkbacon-scripts")
     end
 })
-
+Tabs.Creds:AddButton({
+    Title = "Diacord server",
+    Description = "Discord server",
+    Callback = function()
+        setclipboard("https://discord.gg/GcbAzvW5")
+    end
+})
 
 
 local Section = Tabs.Info:AddSection("Info")
