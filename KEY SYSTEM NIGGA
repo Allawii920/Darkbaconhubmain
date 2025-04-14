@@ -1,0 +1,99 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Player = game.Players.LocalPlayer
+
+-- Create Window
+local Window = Fluent:CreateWindow({
+    Title = "darkbacon hub | Key System",
+    SubTitle = " [ Made by darkbacon ]",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 500),
+    Acrylic = false,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+Fluent:Notify({
+    Title = "Logged in!",
+    Content = "You have Logged in as " .. Player.Name,
+    SubContent = "SubContent", -- Optional
+    Duration = 5 -- Set to nil to make the notification not disappear
+})
+
+getgenv().Key = "ÄMMÄ"  -- Random Thing
+getgenv().KeyInput = "" -- correct key
+
+function DarkBaconScriptHub()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Allawii920/Darkbaconhubmain/refs/heads/main/Main"))()
+end
+
+function CorrectKeyNotification()
+    Fluent:Notify({
+        Title = "Correct Key!",
+        Content = "You have Entered Correct Key!", 
+        SubContent = "SubContent", -- Optional
+        Duration = 5 -- Set to nil to make the notification not disappear
+    })
+end
+
+function IncorrectKeyNotification()
+    Fluent:Notify({
+        Title = "Incorrect Key!",
+        Content = "You have Entered Incorrect Key!", 
+        SubContent = "SubContent", -- Optional
+        Duration = 5 -- Set to nil to make the notification not disappear
+    })
+end
+
+function DestroyScript()
+    -- Destroy the script instance
+    Fluent:Destroy()
+end
+
+-- Create Tabs
+local Tabs = { 
+    Main = Window:AddTab({ Title = "Main", Icon = "home" })
+}
+
+Tabs.Main:AddParagraph({
+    Title = "Info",
+    Content = "Paste the link to your discord to get my key!\nKey are only 24h"
+})
+
+-- Add Input Field
+local Input = Tabs.Main:AddInput("Input", {
+    Title = "Enter Key",
+    Default = "",
+    Placeholder = "Placeholder",
+    Numeric = false, -- Only allows numbers
+    Finished = false, -- Only calls callback when you press enter
+    Callback = function(Value)
+        -- This is where the input value is updated
+        getgenv().KeyInput = Value  -- Directly set the value to KeyInput
+    end
+})
+
+-- Add Button to Check Key
+Tabs.Main:AddButton({
+    Title = "Check Key",
+    Description = "Check Your Key",
+    Callback = function()
+        if getgenv().KeyInput == getgenv().Key then
+            DarkBaconScriptHub()
+            CorrectKeyNotification()
+            DestroyScript() 
+        else
+            IncorrectKeyNotification()
+        end
+    end
+})
+
+Tabs.Main:AddButton({
+    Title = "Copy Link (discord)",
+    Description = "Paste it to your discord/Browser to join my discord server",
+    Callback = function()
+        setclipboard("https://discord.gg/GcbAzvW5")
+    end
+})
+
+Window:SelectTab(1)
