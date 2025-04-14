@@ -1,0 +1,479 @@
+--// Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+
+--// Local Player & Character
+local lp = Players.LocalPlayer
+local char = lp.Character or lp.CharacterAdded:Wait()
+local humanoid = char:WaitForChild("Humanoid")
+local rootPart = char:WaitForChild("HumanoidRootPart")
+local cam = Workspace.CurrentCamera
+
+--// State Vars
+local isBlowin = false
+local isSellin = false 
+local sellDelay = 1
+local selectedEgg = nil
+local selectedEggAmount = nil
+local BuysEgg = false
+local selectedTPP = nil
+local autoCollect = false
+local isClaimingPlaytime = false
+
+--// All Lists
+local Egglist = {
+    "Common Egg",
+    "Spotted Egg",
+    "Iceshard Egg",
+    "Spikey Egg",
+    "Magma Egg",
+    "Crystal Egg",
+    "Lunar Egg",
+    "Void Egg",
+    "Hell Egg",
+    "Nightmare Egg",
+    "Rainbow Egg",
+}
+
+local TPP = {
+    "Main/Spwan",
+    "Floating Island",
+    "Outer Space",
+    "Twilight",
+    "The Void",
+    "Zen",
+}
+
+local Codes = {
+    "RELEASE",
+    "Lucky",
+    "Thanks",
+}
+
+local Chests = {
+    "Void Chest",
+    "Giant Chest",
+}
+
+--// Fluent UI Load
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+--// Create Window
+local Window = Fluent:CreateWindow({
+    Title = "Bubble gum simulator inf : darkbaconyt!",
+    SubTitle = "by Allawionly",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(600, 400),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+--// Tabs
+local Tabs = {
+    Update = Window:AddTab({ Title = "Update Log", Icon = "arrow-big-up" }),
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Egg = Window:AddTab({ Title = "Egg", Icon = "egg" }),
+    Tp = Window:AddTab({ Title = "Teleport", Icon = "map" }),
+    Player = Window:AddTab({ Title = "Player Settings", Icon = "person-standing" }),
+    Creds = Window:AddTab({ Title = "Credits", Icon = "award" }),
+}
+
+--// Sections
+Tabs.Main:AddSection("Main Stuff")
+Tabs.Egg:AddSection("Egg Managment")
+Tabs.Tp:AddSection("Teleport To an Island")
+Tabs.Player:AddSection("Change Player Settings")
+Tabs.Creds:AddSection("Credit to owner")
+
+--// Auto Blow Toggle
+local BlowToggle = Tabs.Main:AddToggle("AutoBlowToggle", {
+    Title = "Auto Blow",
+    Default = false
+})
+
+BlowToggle:OnChanged(function(state)
+    isBlowin = state
+    task.spawn(function()
+        while isBlowin do
+            ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("BlowBubble")
+            task.wait(0.1)
+        end
+    end)
+end)
+
+--// Auto Sell Toggle
+local SellToggle = Tabs.Main:AddToggle("AutoSellToggle", {
+    Title = "Auto SellBubble",
+    Default = false
+})
+
+SellToggle:OnChanged(function(state)
+    isSellin = state
+    task.spawn(function()
+        while isSellin do
+            ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("SellBubble")
+            task.wait(sellDelay)
+        end
+    end)
+end)
+
+--// Sell Delay Input
+Tabs.Main:AddInput("SellDelayInput", {
+    Title = "How many seconds to sell?",
+    Default = "1",
+    Placeholder = "Type a number...",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local number = tonumber(Value)
+        if number and number > 0 then
+            sellDelay = number
+            print("Sell delay updated to: " .. sellDelay .. "s")
+        else
+            warn("Invalid number input.")
+        end
+    end
+})
+
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false })
+Toggle:OnChanged(function(state)
+    autoCollect = state
+end)
+
+-- Get the folder from Rendered
+local rendered = workspace:WaitForChild("Rendered")
+local pickupFolder = rendered:GetChildren()[12]
+
+-- Safety check
+if not pickupFolder or not pickupFolder:IsA("Folder") then
+    warn("Pickup folder not found or not a Folder!")
+    return
+end
+
+-- Loop to collect
+task.spawn(function()
+    while true do
+        if autoCollect then
+            for _, model in ipairs(pickupFolder:GetChildren()) do
+                if model:IsA("Model") then
+                    local args = {
+                        [1] = model.Name
+                    }
+                    game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(unpack(args))
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+local Toggle = Tabs.Main:AddToggle("AutoPlaytimeToggle", {
+    Title = "Auto Claim Playtime",
+    Default = false
+})
+
+Toggle:OnChanged(function(state)
+    isClaimingPlaytime = state
+    if state then
+        task.spawn(function()
+            while isClaimingPlaytime do
+                for i = 1, 9 do
+                    local args = { "ClaimPlaytime", i }
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Function:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.5) -- delay between each claim to prevent spamming
+                end
+                task.wait(5) -- wait before restarting loop
+            end
+        end)
+    end
+end)
+
+local isCollectingChests = false
+
+Tabs.Main:AddToggle("AutoChestToggle", {
+    Title = "Auto Collect Chests",
+    Default = false
+}):OnChanged(function(state)
+    isCollectingChests = state
+    task.spawn(function()
+        while isCollectingChests do
+            for _, chest in ipairs(Chests) do
+                local args = {
+                    [1] = "ClaimChest",
+                    [2] = chest
+                }
+                pcall(function()
+                    ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+                end)
+                task.wait(0.5) -- Short delay between chests
+            end
+            task.wait(10) -- Delay before repeating loop
+        end
+    end)
+end)
+
+
+
+--// Egg Amount Dropdown
+Tabs.Egg:AddDropdown("EggAmountDropdown", {
+    Title = "Select Amount",
+    Description = "How many eggs you want to hatch?",
+    Values = {"1", "2"},
+    Multi = false,
+    Default = nil,
+    Callback = function(Value)
+        selectedEggAmount = tonumber(Value)
+    end
+})
+
+--// Egg Selection Dropdown
+Tabs.Egg:AddDropdown("EggDropdown", {
+    Title = "Select an Egg",
+    Description = "MUST BE NEAR THE EGG",
+    Values = Egglist,
+    Multi = false,
+    Default = nil,
+    Callback = function(Value)
+        selectedEgg = Value
+    end
+})
+
+--// Auto Buy Egg Toggle
+Tabs.Egg:AddToggle("BuyEggToggle", {
+    Title = "Buy Selected Egg",
+    Default = false
+}):OnChanged(function(state)
+    BuysEgg = state
+    task.spawn(function()
+        while BuysEgg do
+            if selectedEgg and selectedEggAmount then
+                local args = {
+                    [1] = "HatchEgg",
+                    [2] = selectedEgg,
+                    [3] = selectedEggAmount
+                }
+                ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+            end
+            task.wait(1)
+        end
+    end)
+end)
+
+--// Teleport Dropdown
+Tabs.Tp:AddDropdown("Dropdown", {
+    Title = "Select a island",
+    Values = TPP,
+    Multi = false,
+    Default = nil,
+    Callback = function(Value)
+        selectedTPP = Value
+    end
+})
+
+--// Teleport Toggle (non-spamming)
+Tabs.Tp:AddToggle("MyToggle", {
+    Title = "Teleport",
+    Default = false
+}):OnChanged(function(state)
+    if state and selectedTPP then
+        local teleportTargets = {
+            ["Main/Spwan"] = "Workspace.Worlds.The Overworld.PortalSpawn",
+            ["Floating Island"] = "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
+            ["Outer Space"] = "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
+            ["Twilight"] = "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
+            ["The Void"] = "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
+            ["Zen"] = "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
+        }
+
+        local target = teleportTargets[selectedTPP]
+        if target then
+            ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", target)
+        else
+            warn("Teleport target not found for: " .. tostring(selectedTPP))
+        end
+    end
+end)
+
+--// PLAYER SETTINGS!
+Tabs.Player:AddSlider("JumpSlider", {
+    Title = "JumpPower",
+    Description = "Edit your JumpPower",
+    Default = 60,
+    Min = 0,
+    Max = 1000,
+    Rounding = 1,
+    Callback = function(j)
+        humanoid.JumpPower = j
+    end
+})
+
+Tabs.Player:AddSlider("FovSlider", {
+    Title = "Fov",
+    Description = "Edit your Fov",
+    Default = 70,
+    Min = 0,
+    Max = 120,
+    Rounding = 1,
+    Callback = function(j)
+        cam.FieldOfView = j
+    end
+})
+
+Tabs.Player:AddButton({
+    Title = "Redeem Codes",
+    Description = "Redeem Codes to get items!",
+    Callback = function()
+        local codes = {
+            "Thanks",
+            "Lucky",
+            "RELEASE",
+        }
+
+        local remote = ReplicatedStorage.Remotes:FindFirstChild("Redeem Code")
+        if remote then
+            for _, code in ipairs(codes) do
+                pcall(function()
+                    remote:InvokeServer(code)
+                    task.wait(0.5) -- add slight delay between codes
+                end)
+            end
+        else
+            warn("Redeem Code remote not found!")
+        end
+    end
+})
+
+
+local Input = Tabs.Player:AddInput("Input", {
+Title = "Input Audio",
+Description = "Listen to music",
+Default = "rbxassetid://142376088", 
+Placeholder = "rbxassetid://ID",
+Numeric = false, Finished = false})
+Input:OnChanged(function(Value)
+    _G.AudioID = Value
+end)
+
+
+
+local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Loop Audio", Default = false })
+Toggle:OnChanged(function(Value)
+    _G.AudioLooped = Value
+end)
+
+local Slider = Tabs.Player:AddSlider("Slider", {Title = "Volume Audio", Description = "", Default = 10, Min = 0, Max = 20, Rounding = 1})
+Slider:OnChanged(function(Value)
+    _G.AudioVolume = Value
+end)
+
+Tabs.Player:AddButton({ Title = "Play Audio", Description = "", Callback = function()
+    local Sound = Instance.new('Sound',workspace)
+    Sound.Volume = _G.AudioVolume
+    Sound.Looped = _G.AudioLooped
+    Sound.SoundId = _G.AudioID
+    if not Sound:Play() then
+        Sound:Play()
+    end
+end})
+
+Tabs.Player:AddButton({ Title = "Stop Audio", Description = "", Callback = function()
+    if game:GetService("Workspace"):FindFirstChild("Sound") then
+        game:GetService("Workspace").Sound:Destroy()
+    end
+end})
+
+
+--// CREDITS
+Tabs.Creds:AddParagraph({
+        Title = "Credit to",
+        Content = "Credits to Allawi Making this on his own!!!\nSub to him!!!"
+    })
+
+
+Tabs.Creds:AddButton({
+    Title = "Discord",
+    Description = "Join Our discord server",
+    Callback = function()
+        setclipboard("https://discord.gg/9zX8dT4DDh")
+    end
+})
+
+Tabs.Creds:AddButton({
+    Title = "Youtube",
+    Description = "Sub To my yt channel",
+    Callback = function()
+        setclipboard("@Darkbacon-scripts")
+    end
+})
+
+--// UPDATES
+Tabs.Update:AddParagraph({
+    Title = "Release!",
+    Content = "[+] Auto Bubble\n[+] Auto sell\n[+] Auto collect drops\n[+] Auto playtime rewards\n[+] Auto Chest\n\n\n[+] & More!\nHey, Join my Discord: https://discord.gg/9zX8dT4DDh for more updates!"
+})
+
+--// Open Main Tab on Start
+Window:SelectTab(1)
+
+--// Function to Unlock All Islands
+local function unlockAllIslands()
+    local locations = {
+        "Workspace.Worlds.The Overworld.PortalSpawn",
+        "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
+    }
+
+    for _, loc in ipairs(locations) do
+        ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", loc)
+        task.wait(0.1)
+    end
+end
+
+-- Call function once at script start
+unlockAllIslands()
+
+--//-//--//-// GUI 
+local ScreenGui = Instance.new("ScreenGui")
+local ImageButton = Instance.new("ImageButton")
+local UICorner = Instance.new("UICorner")
+local TextLabel = Instance.new("TextLabel")
+
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Light white with a hint of grey
+ImageButton.Parent = ScreenGui
+ImageButton.BackgroundColor3 = Color3.fromRGB(240, 240, 240)  
+ImageButton.BorderSizePixel = 0
+ImageButton.Position = UDim2.new(0.120833337, 0, 0.0952890813, 0)
+ImageButton.Size = UDim2.new(0, 120, 0, 50)
+ImageButton.Draggable = true
+ImageButton.Image = ""
+
+-- Text styling
+TextLabel.Parent = ImageButton
+TextLabel.Text = "DarkBacon"
+TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0)  -- Black text
+TextLabel.TextSize = 16
+TextLabel.Font = Enum.Font.GothamBold
+TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+TextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+TextLabel.BackgroundTransparency = 1
+TextLabel.Size = UDim2.new(1, 0, 1, 0)
+TextLabel.TextStrokeTransparency = 0.5
+TextLabel.TextStrokeColor3 = Color3.fromRGB(180, 180, 180)
+
+UICorner.Parent = ImageButton
+
+ImageButton.MouseButton1Down:Connect(function()
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
+end)
