@@ -6,6 +6,7 @@ local Player = game.Players.LocalPlayer
 getgenv().Key = "OLenHjim"  -- Your key here
 getgenv().KeyInput = "" -- User input
 local keyFile = "darkbacon_key.txt"
+local keyDuration = 8640000 -- 100 days in seconds
 
 -- Function to check if the key is still valid
 local function isKeyValid()
@@ -18,7 +19,7 @@ local function isKeyValid()
 
     if savedKey ~= getgenv().Key then return false end
 
-    if os.time() - timestamp > 86400 then -- 24 hours in seconds
+    if os.time() - timestamp > keyDuration then
         delfile(keyFile)
         Fluent:Notify({
             Title = "Key Expired",
@@ -43,15 +44,16 @@ local function notifyTimeLeft()
     local content = readfile(keyFile)
     local data = string.split(content, "|")
     local timestamp = tonumber(data[2])
-    local timeLeft = 86400 - (os.time() - timestamp)
+    local timeLeft = keyDuration - (os.time() - timestamp)
 
-    local hours = math.floor(timeLeft / 3600)
+    local days = math.floor(timeLeft / 86400)
+    local hours = math.floor((timeLeft % 86400) / 3600)
     local minutes = math.floor((timeLeft % 3600) / 60)
     local seconds = timeLeft % 60
 
     Fluent:Notify({
         Title = "Key Time Left",
-        Content = string.format("Your key expires in %02dh %02dm %02ds", hours, minutes, seconds),
+        Content = string.format("Key expires in %dd %02dh %02dm %02ds", days, hours, minutes, seconds),
         Duration = 8
     })
 end
@@ -118,7 +120,7 @@ local Tabs = {
 
 Tabs.Main:AddParagraph({
     Title = "Info",
-    Content = "Paste the link to your discord to get my key!\nKey is only valid for 24h"
+    Content = "Paste the link to your discord to get my key!\nKey is valid for 100 days"
 })
 
 -- Add Input Field
