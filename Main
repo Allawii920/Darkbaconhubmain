@@ -351,8 +351,7 @@ Tabs.Player:AddButton({
 
 
 local Input = Tabs.Player:AddInput("Input", {
-Title = "Input Audio",
-Description = "Listen to music",
+Title = "Input Audio", 
 Default = "rbxassetid://142376088", 
 Placeholder = "rbxassetid://ID",
 Numeric = false, Finished = false})
@@ -417,6 +416,12 @@ Tabs.Update:AddParagraph({
     Title = "Release!",
     Content = "[+] Auto Bubble\n[+] Auto sell\n[+] Auto collect drops\n[+] Auto playtime rewards\n[+] Auto Chest\n\n\n[+] & More!\nHey, Join my Discord: https://discord.gg/9zX8dT4DDh for more updates!"
 })
+
+Tabs.Update:AddParagraph({
+    Title = "Next Update",
+    Content = "Soon!"
+})
+
 
 --// Open Main Tab on Start
 Window:SelectTab(1)
