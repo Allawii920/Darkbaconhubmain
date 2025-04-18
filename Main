@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
+local VirtualUser = game:GetService('VirtualUser')
 
 --// Local Player & Character
 local lp = Players.LocalPlayer
@@ -19,10 +20,14 @@ local sellDelay = 1
 local selectedEgg = nil
 local selectedEggAmount = nil
 local BuysEgg = false
-local selectedTPP = nil
 local autoCollect = false
 local isClaimingPlaytime = false
-
+local isUpgradeMasteryAll = false
+local isCollectingPass = false
+local isCollectingChests = false
+local teleportEnabled = false
+local selectedTPP = nil
+local afkEnabled = false
 --// All Lists
 local Egglist = {
     "Common Egg",
@@ -57,6 +62,8 @@ local Chests = {
     "Void Chest",
     "Giant Chest",
 }
+
+local categories = {"Pets", "Buffs", "Shops"}
 
 --// Fluent UI Load
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
@@ -100,7 +107,7 @@ BlowToggle:OnChanged(function(state)
     task.spawn(function()
         while isBlowin do
             ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("BlowBubble")
-            task.wait(0.1)
+            task.wait(0.5)
         end
     end)
 end)
@@ -139,7 +146,7 @@ Tabs.Main:AddInput("SellDelayInput", {
     end
 })
 
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false })
+Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false })
 Toggle:OnChanged(function(state)
     autoCollect = state
 end)
@@ -158,18 +165,31 @@ end
 task.spawn(function()
     while true do
         if autoCollect then
-            for _, model in ipairs(pickupFolder:GetChildren()) do
-                if model:IsA("Model") then
-                    local args = {
-                        [1] = model.Name
-                    }
-                    game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(unpack(args))
+            local models = pickupFolder:GetChildren()
+            if #models > 0 then
+                for _, model in ipairs(models) do
+                    if model:IsA("Model") and model.Parent == pickupFolder then
+                        -- Fire to collect
+                        game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(model.Name)
+
+                        -- Optional: small wait to ensure server handles it
+                        task.wait(0.05)
+
+                        -- Double check it's still there before destroying
+                        if model and model.Parent == pickupFolder then
+                            model:Destroy()
+                        end
+                    end
                 end
+            else
+                -- Wait until at least one child appears
+                pickupFolder.ChildAdded:Wait()
             end
         end
         task.wait(0.1)
     end
 end)
+
 
 local Toggle = Tabs.Main:AddToggle("AutoPlaytimeToggle", {
     Title = "Auto Claim Playtime",
@@ -194,8 +214,6 @@ Toggle:OnChanged(function(state)
     end
 end)
 
-local isCollectingChests = false
-
 Tabs.Main:AddToggle("AutoChestToggle", {
     Title = "Auto Collect Chests",
     Default = false
@@ -218,13 +236,42 @@ Tabs.Main:AddToggle("AutoChestToggle", {
     end)
 end)
 
+Tabs.Main:AddToggle("AutoClaimPassToggle", {
+    Title = "Auto Claim Pass",
+    Default = false
+}):OnChanged(function(state)
+    isCollectingPass = state
+    task.spawn(function()
+        while isCollectingPass do
+            local args = { [1] = "ClaimSeason" }
+            game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+            task.wait(10)
+        end
+    end)
+end)
 
+
+Tabs.Main:AddToggle("AutoMasteryToggle", {
+    Title = "Auto Update All Mastery",
+    Default = false
+}):OnChanged(function(state)
+    isUpgradeMasteryAll = state
+    task.spawn(function()
+        while isUpgradeMasteryAll do 
+            for _, category in ipairs(categories) do
+                local args = { [1] = "UpgradeMastery", [2] = category }
+                game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+                task.wait(0.5)
+            end
+        end
+    end)
+end)
 
 --// Egg Amount Dropdown
 Tabs.Egg:AddDropdown("EggAmountDropdown", {
     Title = "Select Amount",
     Description = "How many eggs you want to hatch?",
-    Values = {"1", "2"},
+    Values = {"1", "2", "3", "5", "6"},
     Multi = false,
     Default = nil,
     Callback = function(Value)
@@ -265,65 +312,69 @@ Tabs.Egg:AddToggle("BuyEggToggle", {
     end)
 end)
 
---// Teleport Dropdown
+local teleportTargets = {
+    ["Main/Spwan"] = "Workspace.Worlds.The Overworld.PortalSpawn",
+    ["Floating Island"] = "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
+    ["Outer Space"] = "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
+    ["Twilight"] = "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
+    ["The Void"] = "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
+    ["Zen"] = "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
+}
+
+-- Dropdown (teleports on selection if toggle is ON)
 Tabs.Tp:AddDropdown("Dropdown", {
-    Title = "Select a island",
+    Title = "Select an island",
     Values = TPP,
     Multi = false,
     Default = nil,
     Callback = function(Value)
         selectedTPP = Value
+        if teleportEnabled then
+            local target = teleportTargets[selectedTPP]
+            if target then
+                ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", target)
+            end
+        end
     end
 })
 
---// Teleport Toggle (non-spamming)
+-- Toggle (just enables teleporting on selection)
 Tabs.Tp:AddToggle("MyToggle", {
     Title = "Teleport",
     Default = false
 }):OnChanged(function(state)
-    if state and selectedTPP then
-        local teleportTargets = {
-            ["Main/Spwan"] = "Workspace.Worlds.The Overworld.PortalSpawn",
-            ["Floating Island"] = "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
-            ["Outer Space"] = "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
-            ["Twilight"] = "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
-            ["The Void"] = "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
-            ["Zen"] = "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
-        }
+    teleportEnabled = state
 
+    -- Optional: teleport immediately if something was already selected
+    if teleportEnabled and selectedTPP then
         local target = teleportTargets[selectedTPP]
         if target then
             ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", target)
-        else
-            warn("Teleport target not found for: " .. tostring(selectedTPP))
         end
     end
 end)
 
---// PLAYER SETTINGS!
-Tabs.Player:AddSlider("JumpSlider", {
-    Title = "JumpPower",
-    Description = "Edit your JumpPower",
-    Default = 60,
-    Min = 0,
-    Max = 1000,
-    Rounding = 1,
-    Callback = function(j)
-        humanoid.JumpPower = j
-    end
-})
 
-Tabs.Player:AddSlider("FovSlider", {
-    Title = "Fov",
-    Description = "Edit your Fov",
-    Default = 70,
-    Min = 0,
-    Max = 120,
-    Rounding = 1,
-    Callback = function(j)
-        cam.FieldOfView = j
+
+--// PLAYER SETTINGS!
+local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Anti-AFK", Default = false})
+
+-- Function to enable AFK
+local function enableAFK()
+    while afkEnabled do
+        wait(600) -- Wait 10 minutes
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new()) -- Simulate a click to prevent AFK kick
     end
-})
+end
+
+Toggle:OnChanged(function(value)
+    afkEnabled = value
+    if afkEnabled then
+        spawn(enableAFK)
+    end
+end)
+
 
 Tabs.Player:AddButton({
     Title = "Redeem Codes",
@@ -371,22 +422,56 @@ Slider:OnChanged(function(Value)
     _G.AudioVolume = Value
 end)
 
-Tabs.Player:AddButton({ Title = "Play Audio", Description = "", Callback = function()
-    local Sound = Instance.new('Sound',workspace)
-    Sound.Volume = _G.AudioVolume
-    Sound.Looped = _G.AudioLooped
-    Sound.SoundId = _G.AudioID
-    if not Sound:Play() then
-        Sound:Play()
-    end
-end})
+local currentlyPlayingSound = nil
 
-Tabs.Player:AddButton({ Title = "Stop Audio", Description = "", Callback = function()
-    if game:GetService("Workspace"):FindFirstChild("Sound") then
-        game:GetService("Workspace").Sound:Destroy()
-    end
-end})
+Tabs.Player:AddButton({
+    Title = "Play Audio",
+    Description = "",
+    Callback = function()
+        -- Stop current sound if playing
+        if currentlyPlayingSound and currentlyPlayingSound:IsDescendantOf(workspace) then
+            currentlyPlayingSound:Stop()
+            currentlyPlayingSound:Destroy()
+            task.wait(0.1)
+        end
 
+        -- Make sure AudioID is set
+        if not _G.AudioID or _G.AudioID == "" then
+            warn("No Audio ID set!")
+            return
+        end
+
+        -- Create new sound
+        local sound = Instance.new('Sound', workspace)
+        sound.SoundId = _G.AudioID
+        sound.Volume = _G.AudioVolume or 10
+        sound.Looped = _G.AudioLooped or false
+
+        -- Assign it to global reference
+        currentlyPlayingSound = sound
+
+        -- Play it
+        local success, err = pcall(function()
+            sound:Play()
+        end)
+
+        if not success then
+            warn("Failed to play sound:", err)
+        end
+    end
+})
+
+Tabs.Player:AddButton({
+    Title = "Stop Audio",
+    Description = "",
+    Callback = function()
+        if currentlyPlayingSound and currentlyPlayingSound:IsDescendantOf(workspace) then
+            currentlyPlayingSound:Stop()
+            currentlyPlayingSound:Destroy()
+            currentlyPlayingSound = nil
+        end
+    end
+})
 
 --// CREDITS
 Tabs.Creds:AddParagraph({
@@ -418,8 +503,8 @@ Tabs.Update:AddParagraph({
 })
 
 Tabs.Update:AddParagraph({
-    Title = "Next Update",
-    Content = "Soon!"
+    Title = "Added/Fixes",
+    Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n\nif is bugs REPORT TO DISCORD!"
 })
 
 
