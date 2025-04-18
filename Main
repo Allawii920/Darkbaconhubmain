@@ -146,12 +146,13 @@ Tabs.Main:AddInput("SellDelayInput", {
     end
 })
 
-Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false })
+-- Toggle for auto collecting
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false})
 Toggle:OnChanged(function(state)
     autoCollect = state
 end)
 
--- Get the folder from Rendered
+-- Get the folder from workspace
 local rendered = workspace:WaitForChild("Rendered")
 local pickupFolder = rendered:GetChildren()[12]
 
@@ -161,7 +162,7 @@ if not pickupFolder or not pickupFolder:IsA("Folder") then
     return
 end
 
--- Loop to collect
+-- Auto collect loop
 task.spawn(function()
     while true do
         if autoCollect then
@@ -172,23 +173,37 @@ task.spawn(function()
                         -- Fire to collect
                         game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(model.Name)
 
-                        -- Optional: small wait to ensure server handles it
-                        task.wait(0.05)
-
-                        -- Double check it's still there before destroying
-                        if model and model.Parent == pickupFolder then
-                            model:Destroy()
+                        -- Soft-hide the model
+                        for _, part in ipairs(model:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.Transparency = 1
+                                part.CanCollide = false
+                            end
                         end
+
+                            
+
+                        -- Destroy after 2 seconds
+                        task.delay(2, function()
+                            if model and model.Parent then
+                                model:Destroy()
+                            end
+                        end)
+
+                        task.wait(0.01) -- Very short wait between models
                     end
                 end
             else
-                -- Wait until at least one child appears
                 pickupFolder.ChildAdded:Wait()
             end
         end
-        task.wait(0.1)
+        task.wait(0.05) -- Fast loop
     end
 end)
+
+
+
+
 
 
 local Toggle = Tabs.Main:AddToggle("AutoPlaytimeToggle", {
@@ -504,7 +519,7 @@ Tabs.Update:AddParagraph({
 
 Tabs.Update:AddParagraph({
     Title = "Added/Fixes",
-    Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n\nif is bugs REPORT TO DISCORD!"
+    Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n[+] Imporved Auto Collect\n\nif is bugs REPORT TO DISCORD!"
 })
 
 
