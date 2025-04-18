@@ -112,23 +112,26 @@ BlowToggle:OnChanged(function(state)
     end)
 end)
 
---// Auto Sell Toggle
+-- // Auto Sell Toggle
 local SellToggle = Tabs.Main:AddToggle("AutoSellToggle", {
     Title = "Auto SellBubble",
+    Description = "Note: DO NOT JUMP IF THIS IS ON it will cause an error", 
     Default = false
 })
 
 SellToggle:OnChanged(function(state)
     isSellin = state
+
     task.spawn(function()
         while isSellin do
+            -- Safe Sell Call
             ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("SellBubble")
-            task.wait(sellDelay)
+            task.wait(sellDelay) -- Custom delay between sells
         end
     end)
 end)
 
---// Sell Delay Input
+-- // Sell Delay Input
 Tabs.Main:AddInput("SellDelayInput", {
     Title = "How many seconds to sell?",
     Default = "1",
@@ -146,60 +149,62 @@ Tabs.Main:AddInput("SellDelayInput", {
     end
 })
 
--- Toggle for auto collecting
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Gems/Coins", Default = false})
+-- // Auto Collect Toggle
+local Toggle = Tabs.Main:AddToggle("MyToggle", {
+    Title = "Auto Gems/Coins",
+    Description = "Note: DO NOT JUMP IF THIS IS ON it will cause an error",
+    Default = false
+})
+
 Toggle:OnChanged(function(state)
     autoCollect = state
 end)
 
--- Get the folder from workspace
+-- // Safe Pickup Folder
 local rendered = workspace:WaitForChild("Rendered")
 local pickupFolder = rendered:GetChildren()[12]
 
--- Safety check
 if not pickupFolder or not pickupFolder:IsA("Folder") then
     warn("Pickup folder not found or not a Folder!")
     return
 end
 
--- Auto collect loop
+-- // Auto Collect Loop (Co-op Friendly)
 task.spawn(function()
     while true do
         if autoCollect then
-            local models = pickupFolder:GetChildren()
-            if #models > 0 then
-                for _, model in ipairs(models) do
-                    if model:IsA("Model") and model.Parent == pickupFolder then
-                        -- Fire to collect
-                        game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(model.Name)
+            for _, model in ipairs(pickupFolder:GetChildren()) do
+                if model:IsA("Model") and model.Parent == pickupFolder then
+                    -- Request pickup
+                    ReplicatedStorage.Remotes.Pickups.CollectPickup:FireServer(model.Name)
 
-                        -- Soft-hide the model
-                        for _, part in ipairs(model:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                part.Transparency = 1
-                                part.CanCollide = false
-                            end
+                    -- Hide model
+                    for _, part in ipairs(model:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.Transparency = 1
+                            part.CanCollide = false
                         end
-
-                            
-
-                        -- Destroy after 2 seconds
-                        task.delay(2, function()
-                            if model and model.Parent then
-                                model:Destroy()
-                            end
-                        end)
-
-                        task.wait(0.01) -- Very short wait between models
                     end
+
+                    if model.PrimaryPart then
+                        model:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
+                    end
+
+                    -- Destroy after 2 seconds
+                    task.delay(2, function()
+                        if model and model.Parent then
+                            model:Destroy()
+                        end
+                    end)
+
+                    task.wait(0.02) -- Faster but not overwhelming
                 end
-            else
-                pickupFolder.ChildAdded:Wait()
             end
         end
-        task.wait(0.05) -- Fast loop
+        task.wait(0.05) -- Overall loop tick rate
     end
 end)
+
 
 
 
