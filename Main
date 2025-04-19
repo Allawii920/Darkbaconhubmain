@@ -41,6 +41,8 @@ local Egglist = {
     "Hell Egg",
     "Nightmare Egg",
     "Rainbow Egg",
+    "Pastel Egg",
+    "Bunny Egg"
 }
 
 local TPP = {
@@ -115,7 +117,7 @@ end)
 -- // Auto Sell Toggle
 local SellToggle = Tabs.Main:AddToggle("AutoSellToggle", {
     Title = "Auto SellBubble",
-    Description = "Note: DO NOT JUMP IF THIS IS ON it will cause an error", 
+    Description = "Note: BE NEAR THE SELL PLACE", 
     Default = false
 })
 
@@ -149,10 +151,11 @@ Tabs.Main:AddInput("SellDelayInput", {
     end
 })
 
--- // Auto Collect Toggle
+
+--// Auto Collect Toggle
 local Toggle = Tabs.Main:AddToggle("MyToggle", {
     Title = "Auto Gems/Coins",
-    Description = "Note: DO NOT JUMP IF THIS IS ON it will cause an error",
+    Description = "Note: DO NOT JUMP IF THIS IS ON or it may cause errors",
     Default = false
 })
 
@@ -160,25 +163,61 @@ Toggle:OnChanged(function(state)
     autoCollect = state
 end)
 
--- // Safe Pickup Folder
+--// Safe Pickup Folder
 local rendered = workspace:WaitForChild("Rendered")
-local pickupFolder = rendered:GetChildren()[12]
+local pickupFolder = rendered:GetChildren()[14] -- Or use rendered:FindFirstChild("Pickups")
 
 if not pickupFolder or not pickupFolder:IsA("Folder") then
     warn("Pickup folder not found or not a Folder!")
     return
 end
 
--- // Auto Collect Loop (Co-op Friendly)
+--// Jump Detection & Auto Re-enable
+local isJumping = false
+local player = game.Players.LocalPlayer
+local autoReEnableAfterJump = false
+
+local function setupJumpDetection()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+
+    humanoid.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Jumping or newState == Enum.HumanoidStateType.Freefall then
+            isJumping = true
+            if autoCollect then
+                autoReEnableAfterJump = true
+                autoCollect = false
+                Toggle:SetValue(false)  -- Disable the toggle when jumping
+                warn("Auto Collect disabled due to jump")
+            end
+        elseif newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running then
+            if isJumping and autoReEnableAfterJump then
+                task.wait(0.2)  -- Give time to settle
+                autoCollect = true
+                Toggle:SetValue(true)  -- Re-enable the toggle after landing
+                autoReEnableAfterJump = false
+                warn("Auto Collect re-enabled after landing")
+            end
+            isJumping = false
+        end
+    end)
+end
+
+setupJumpDetection()
+player.CharacterAdded:Connect(setupJumpDetection)
+
+--// Auto Collect Loop
 task.spawn(function()
     while true do
-        if autoCollect then
+        if autoCollect and not isJumping then
             for _, model in ipairs(pickupFolder:GetChildren()) do
-                if model:IsA("Model") and model.Parent == pickupFolder then
-                    -- Request pickup
-                    ReplicatedStorage.Remotes.Pickups.CollectPickup:FireServer(model.Name)
+                if model:IsA("Model") and model.Parent == pickupFolder and model.Parent then
+                    -- Collect the pickup
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(model.Name)
+                    end)
 
-                    -- Hide model
+                    -- Hide model parts
                     for _, part in ipairs(model:GetDescendants()) do
                         if part:IsA("BasePart") then
                             part.Transparency = 1
@@ -186,24 +225,35 @@ task.spawn(function()
                         end
                     end
 
+                    -- Move model underground
                     if model.PrimaryPart then
-                        model:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
+                        pcall(function()
+                            model:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
+                        end)
                     end
 
-                    -- Destroy after 2 seconds
+                    -- Destroy safely after 2 seconds
                     task.delay(2, function()
                         if model and model.Parent then
-                            model:Destroy()
+                            pcall(function()
+                                model:Destroy()
+                            end)
                         end
                     end)
 
-                    task.wait(0.02) -- Faster but not overwhelming
+                    task.wait(0.02)
                 end
             end
         end
-        task.wait(0.05) -- Overall loop tick rate
+        task.wait(0.05)
     end
 end)
+
+
+
+
+
+
 
 
 
@@ -251,7 +301,7 @@ Tabs.Main:AddToggle("AutoChestToggle", {
                 end)
                 task.wait(0.5) -- Short delay between chests
             end
-            task.wait(10) -- Delay before repeating loop
+            task.wait(3) -- Delay before repeating loop
         end
     end)
 end)
@@ -524,7 +574,7 @@ Tabs.Update:AddParagraph({
 
 Tabs.Update:AddParagraph({
     Title = "Added/Fixes",
-    Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n[+] Imporved Auto Collect\n\nif is bugs REPORT TO DISCORD!"
+    Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n[+] Imporved Auto Collect\n[+] Fixed Auto Sell[must be near the sell]\n[+] Fixed Auto Collect\n\nif is bugs REPORT TO DISCORD!"
 })
 
 
