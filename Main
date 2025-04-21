@@ -5,7 +5,8 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
 local VirtualUser = game:GetService('VirtualUser')
-
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(15, Enum.EasingStyle.Linear)
 --// Local Player & Character
 local lp = Players.LocalPlayer
 local char = lp.Character or lp.CharacterAdded:Wait()
@@ -28,6 +29,10 @@ local isCollectingChests = false
 local teleportEnabled = false
 local selectedTPP = nil
 local afkEnabled = false
+local teleporting = false
+local currentTween = nil
+local lastSelectedRift = nil
+local selectedRift = nil
 --// All Lists
 local Egglist = {
     "Common Egg",
@@ -54,17 +59,6 @@ local TPP = {
     "Zen",
 }
 
-local Codes = {
-    "RELEASE",
-    "Lucky",
-    "Thanks",
-}
-
-local Chests = {
-    "Void Chest",
-    "Giant Chest",
-}
-
 local categories = {"Pets", "Buffs", "Shops"}
 
 --// Fluent UI Load
@@ -77,31 +71,28 @@ local Window = Fluent:CreateWindow({
     TabWidth = 160,
     Size = UDim2.fromOffset(600, 400),
     Acrylic = true,
-    Theme = "Dark",
+    Theme = "Darker",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 --// Tabs
 local Tabs = {
-    Update = Window:AddTab({ Title = "Update Log", Icon = "arrow-big-up" }),
-    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Update = Window:AddTab({ Title = "Update Log", Icon = "scan-face" }),
+    Main = Window:AddTab({ Title = "Farming", Icon = "home" }),
     Egg = Window:AddTab({ Title = "Egg", Icon = "egg" }),
     Tp = Window:AddTab({ Title = "Teleport", Icon = "map" }),
+   -- Merchants = Window:AddTab({ Title = "Merchants", Icon = "hand-coins" }),
     Player = Window:AddTab({ Title = "Player Settings", Icon = "person-standing" }),
     Creds = Window:AddTab({ Title = "Credits", Icon = "award" }),
 }
 
---// Sections
-Tabs.Main:AddSection("Main Stuff")
-Tabs.Egg:AddSection("Egg Managment")
-Tabs.Tp:AddSection("Teleport To an Island")
-Tabs.Player:AddSection("Change Player Settings")
-Tabs.Creds:AddSection("Credit to owner")
 
+Tabs.Main:AddSection("Auto Bubble")
 --// Auto Blow Toggle
 local BlowToggle = Tabs.Main:AddToggle("AutoBlowToggle", {
     Title = "Auto Blow",
-    Default = false
+    Description = "Auto Blows For you",
+    Default = false,
 })
 
 BlowToggle:OnChanged(function(state)
@@ -114,28 +105,38 @@ BlowToggle:OnChanged(function(state)
     end)
 end)
 
--- // Auto Sell Toggle
-local SellToggle = Tabs.Main:AddToggle("AutoSellToggle", {
-    Title = "Auto SellBubble",
-    Description = "Note: BE NEAR THE SELL PLACE", 
-    Default = false
+Tabs.Main:AddSection("Selling")
+local sellMeth = {
+    "Instantly",
+    "Delay Sell"
+}
+
+-- Dropdown UI
+local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
+    Title = "Sell Method",
+    Description = "Select A Method To Sell",
+    Values = sellMeth,
+    Multi = false,
+    Default = nil,
 })
 
-SellToggle:OnChanged(function(state)
-    isSellin = state
+local sellMethod = nil
+Dropdown:OnChanged(function(Value)
+    sellMethod = Value
 
-    task.spawn(function()
-        while isSellin do
-            -- Safe Sell Call
-            ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("SellBubble")
-            task.wait(sellDelay) -- Custom delay between sells
-        end
-    end)
+    -- Check the new value and adjust accordingly
+    if sellMethod == "Instantly" then
+        print("Switching to Instant Sell")
+    elseif sellMethod == "Delay Sell" then
+        print("Switching to Delay Sell")
+    end
 end)
 
--- // Sell Delay Input
+-- Sell Delay Input
+local sellDelay = 1 -- Default delay
 Tabs.Main:AddInput("SellDelayInput", {
     Title = "How many seconds to sell?",
+    Description = "Put seconds",
     Default = "1",
     Placeholder = "Type a number...",
     Numeric = true,
@@ -151,11 +152,133 @@ Tabs.Main:AddInput("SellDelayInput", {
     end
 })
 
+-- Auto Sell Toggle
+local SellToggle = Tabs.Main:AddToggle("AutoSellToggle", {
+    Title = "Auto SellBubble",
+    Description = "Note: BE NEAR THE SELL PLACE", 
+    Default = false
+})
 
---// Auto Collect Toggle
+SellToggle:OnChanged(function(state)
+    isSellin = state
+
+    task.spawn(function()
+        while isSellin do
+            if sellMethod == "Instantly" then
+                -- Instant sell action
+                ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("SellBubble")
+                task.wait(0.5)  -- Adjust the frequency if needed
+            elseif sellMethod == "Delay Sell" then
+                -- Delayed sell action
+                ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("SellBubble")
+                task.wait(sellDelay)  -- Wait for the delay before next sell
+            else
+                -- In case no method is selected (failsafe)
+                warn("Please select a sell method.")
+                task.wait(1)
+            end
+        end
+    end)
+end)
+
+
+-- store 
+Tabs.Main:AddSection("Gum Store")
+
+local gums = {
+    "Blueberry",
+    "Cherry",
+    "Pizza",
+    "Watermelon",
+    "Chocolate",
+    "Constrast",
+    "Gold",
+    "Lemon",
+    "Dounat",
+    "Swirl",
+    "Molten"
+}
+
+local flavors = {
+    "Strechy Gum",
+    "Chewy Gum",
+    "Epic Gum",
+    "Ultra Gum",
+    "Omega Gum",
+    "Unreal Gum",
+    "Cosmic Gum",
+    "XL Gum",
+    "Mega Gum",
+    "Quantum Gum",
+    "Alien Gum",
+    "Radioactive Gum",
+    "Experiment #52"
+}
+
+-- Auto Buy Gums
+local gumToggle = Tabs.Main:AddToggle("AutoBuyGum", {Title = "Auto Buy Gums", Description = "Auto Buys Gum From Shop", Default = false})
+gumToggle:OnChanged(function(value)
+    if value then
+        task.spawn(function()
+            while gumToggle.Value do
+                for _, gum in ipairs(gums) do
+                    local args = {
+                        [1] = "GumShopPurchase",
+                        [2] = gum
+                    }
+                    game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+                    task.wait(0.1)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end)
+
+-- Auto Buy Flavors
+local flavorToggle = Tabs.Main:AddToggle("AutoBuyFlavor", {Title = "Auto Buy Storage", Description = "Auto Buys Storage From Shop", Default = false})
+flavorToggle:OnChanged(function(value)
+    if value then
+        task.spawn(function()
+            while flavorToggle.Value do
+                for _, flavor in ipairs(flavors) do
+                    local args = {
+                        [1] = "GumShopPurchase",
+                        [2] = flavor
+                    }
+                    game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+                    task.wait(0.1)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end)
+
+Tabs.Main:AddSection("Currency")
+
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+
+-- Dropdown for selecting the method
+local selectedCurrencyMethod = nil
+local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
+    Title = "Select Method",
+    Description = "Select a Method To Collect Drops",
+    Values = {"Drops Tween To Player", "Fast Collect"},
+    Multi = false,
+    Default = nil,
+})
+
+Dropdown:OnChanged(function(Value)
+    selectedCurrencyMethod = Value
+end)
+
+-- Auto Collect Toggle
+local autoCollect = false
 local Toggle = Tabs.Main:AddToggle("MyToggle", {
-    Title = "Auto Gems/Coins",
-    Description = "Note: DO NOT JUMP IF THIS IS ON or it may cause errors",
+    Title = "Auto Drops",
+    Description = "Auto Collect Drops",
     Default = false
 })
 
@@ -163,83 +286,87 @@ Toggle:OnChanged(function(state)
     autoCollect = state
 end)
 
---// Safe Pickup Folder
+-- Safe Pickup Folder
 local rendered = workspace:WaitForChild("Rendered")
-local pickupFolder = rendered:GetChildren()[14] -- Or use rendered:FindFirstChild("Pickups")
+local pickupFolder = rendered:GetChildren()[14]  -- Or use rendered:FindFirstChild("Pickups")
 
 if not pickupFolder or not pickupFolder:IsA("Folder") then
     warn("Pickup folder not found or not a Folder!")
     return
 end
 
---// Jump Detection & Auto Re-enable
-local isJumping = false
-local player = game.Players.LocalPlayer
-local autoReEnableAfterJump = false
-
-local function setupJumpDetection()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local humanoid = char:WaitForChild("Humanoid")
-
-    humanoid.StateChanged:Connect(function(_, newState)
-        if newState == Enum.HumanoidStateType.Jumping or newState == Enum.HumanoidStateType.Freefall then
-            isJumping = true
-            if autoCollect then
-                autoReEnableAfterJump = true
-                autoCollect = false
-                Toggle:SetValue(false)  -- Disable the toggle when jumping
-                warn("Auto Collect disabled due to jump")
-            end
-        elseif newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running then
-            if isJumping and autoReEnableAfterJump then
-                task.wait(0.2)  -- Give time to settle
-                autoCollect = true
-                Toggle:SetValue(true)  -- Re-enable the toggle after landing
-                autoReEnableAfterJump = false
-                warn("Auto Collect re-enabled after landing")
-            end
-            isJumping = false
-        end
-    end)
-end
-
-setupJumpDetection()
-player.CharacterAdded:Connect(setupJumpDetection)
-
---// Auto Collect Loop
+-- Auto Collect Loop
 task.spawn(function()
     while true do
-        if autoCollect and not isJumping then
+        if autoCollect then
             for _, model in ipairs(pickupFolder:GetChildren()) do
-                if model:IsA("Model") and model.Parent == pickupFolder and model.Parent then
-                    -- Collect the pickup
+                if model:IsA("Model") and model.Parent == pickupFolder then
+                    local player = game.Players.LocalPlayer
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+                    -- If hrp or selectedCurrencyMethod is invalid, skip this model and continue to the next one
+                    if not hrp or not selectedCurrencyMethod then
+                        task.wait(0.05)  -- Small delay to avoid unnecessary CPU usage
+                        break  -- This breaks the inner for loop and continues to the next iteration of the while loop
+                    end
+
+                    -- Common: Fire collect
                     pcall(function()
                         game:GetService("ReplicatedStorage").Remotes.Pickups.CollectPickup:FireServer(model.Name)
                     end)
 
-                    -- Hide model parts
-                    for _, part in ipairs(model:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.Transparency = 1
-                            part.CanCollide = false
-                        end
-                    end
+                    -- Method: "Drops Tween To Player" (Move drop to player)
+                    if selectedCurrencyMethod == "Drops Tween To Player" then
+                        local startCFrame = model:GetPivot()
+                        local goalCFrame = CFrame.new(hrp.Position)
 
-                    -- Move model underground
-                    if model.PrimaryPart then
-                        pcall(function()
-                            model:SetPrimaryPartCFrame(CFrame.new(0, -1000, 0))
+                        local cfValue = Instance.new("CFrameValue")
+                        cfValue.Value = startCFrame
+
+                        cfValue:GetPropertyChangedSignal("Value"):Connect(function()
+                            model:PivotTo(cfValue.Value)
+                        end)
+
+                        local tween = TweenService:Create(cfValue, tweenInfo, { Value = goalCFrame })
+                        tween:Play()
+
+                        tween.Completed:Connect(function()
+                            cfValue:Destroy()
+                            for _, part in ipairs(model:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.Transparency = 1
+                                    part.CanCollide = false
+                                end
+                            end
+                            task.delay(0.1, function()
+                                if model and model.Parent then
+                                    pcall(function()
+                                        model:Destroy()
+                                    end)
+                                end
+                            end)
+                        end)
+
+                    -- Method: "Fast Collect" (Instantly hide and destroy the drop)
+                    elseif selectedCurrencyMethod == "Fast Collect" then
+                        -- Hide instantly
+                        for _, part in ipairs(model:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.Transparency = 1
+                                part.CanCollide = false
+                            end
+                        end
+
+                        -- Destroy quickly
+                        task.delay(0.1, function()
+                            if model and model.Parent then
+                                pcall(function()
+                                    model:Destroy()
+                                end)
+                            end
                         end)
                     end
-
-                    -- Destroy safely after 2 seconds
-                    task.delay(2, function()
-                        if model and model.Parent then
-                            pcall(function()
-                                model:Destroy()
-                            end)
-                        end
-                    end)
 
                     task.wait(0.02)
                 end
@@ -256,13 +383,54 @@ end)
 
 
 
+-- mastery
+Tabs.Main:AddSection("Masteris")
+
+Tabs.Main:AddToggle("AutoMasteryToggle", {
+    Title = "Auto Update All Mastery",
+    Description = "Upgrade All Mastery",
+    Default = false
+}):OnChanged(function(state)
+    isUpgradeMasteryAll = state
+    task.spawn(function()
+        while isUpgradeMasteryAll do 
+            for _, category in ipairs(categories) do
+                local args = { [1] = "UpgradeMastery", [2] = category }
+                game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+                task.wait(0.5)
+            end
+        end
+    end)
+end)
+--[[local args = {
+    [1] = "UpgradeMastery",
+    [2] = "Buffs"
+}
+
+game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+
+local args = {
+    [1] = "UpgradeMastery",
+    [2] = "Pets"
+}
+
+game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
 
 
+local args = {
+    [1] = "UpgradeMastery",
+    [2] = "Shops"
+}
+
+game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
+--]]
 
 
+Tabs.Main:AddSection("Others")
 
 local Toggle = Tabs.Main:AddToggle("AutoPlaytimeToggle", {
     Title = "Auto Claim Playtime",
+    Description = "Auto Claim Playtime Reward",
     Default = false
 })
 
@@ -284,30 +452,67 @@ Toggle:OnChanged(function(state)
     end
 end)
 
+
+local Remote = ReplicatedStorage.Shared.Framework.Network.Remote.Event
+-- Map of chest names to their CFrames
+local chestData = {
+    ["Giant Chest"] = CFrame.new(12.5801592, 428.199097, 159.280685, -0.989624381, -2.1960345e-07, 0.143678769, -2.59595254e-07, 1, -2.59595396e-07, -0.143678769, -2.94200248e-07, -0.989624381),
+    ["Void Chest"] = CFrame.new(76.6504517, 10148.4736, 53.0126305, 0.717875361, 5.63404079e-09, 0.696171701, -2.59595112e-07, 1, 2.59595282e-07, -0.696171701, -3.67079821e-07, 0.717875361)
+}
+
+-- List of chest names to collect
+local chestList = {
+    "Void Chest",
+    "Giant Chest"
+}
+
+-- Create toggle in UI (assuming you're using a UI lib like Rayfield or similar)
 Tabs.Main:AddToggle("AutoChestToggle", {
     Title = "Auto Collect Chests",
+    Description = "Auto Collects Chest",
     Default = false
 }):OnChanged(function(state)
     isCollectingChests = state
+
     task.spawn(function()
         while isCollectingChests do
-            for _, chest in ipairs(Chests) do
-                local args = {
-                    [1] = "ClaimChest",
-                    [2] = chest
-                }
-                pcall(function()
-                    ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
-                end)
-                task.wait(0.5) -- Short delay between chests
+            for _, chestName in ipairs(chestList) do
+                local chestCFrame = chestData[chestName]
+                if chestCFrame and char then
+                    if rootPart then
+                        -- Tween to chest
+                        local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = chestCFrame})
+                        tween:Play()
+                        tween.Completed:Wait()
+
+                        local fireDuration = 3 -- seconds to keep firing
+                        local fireInterval = 0.2 -- how often to fire
+                        local endTime = tick() + fireDuration
+
+                        while tick() < endTime and isCollectingChests do
+                            local args = {
+                                [1] = "ClaimChest",
+                                [2] = chestName
+                            }
+
+                            pcall(function()
+                                Remote:FireServer(unpack(args))
+                            end)
+                        task.wait(fireInterval) -- Delay between chests
+                        end
+                    end
+                end
             end
-            task.wait(3) -- Delay before repeating loop
+            task.wait(3600) -- Delay before looping again
         end
     end)
 end)
 
+
+
 Tabs.Main:AddToggle("AutoClaimPassToggle", {
     Title = "Auto Claim Pass",
+    Description = "Auto Claims SeasonPass",
     Default = false
 }):OnChanged(function(state)
     isCollectingPass = state
@@ -320,23 +525,31 @@ Tabs.Main:AddToggle("AutoClaimPassToggle", {
     end)
 end)
 
+Tabs.Main:AddButton({
+    Title = "Redeem Codes",
+    Description = "Redeem Codes to get items!",
+    Callback = function()
+        local codes = {
+            "Thanks",
+            "Lucky",
+            "RELEASE",
+        }
 
-Tabs.Main:AddToggle("AutoMasteryToggle", {
-    Title = "Auto Update All Mastery",
-    Default = false
-}):OnChanged(function(state)
-    isUpgradeMasteryAll = state
-    task.spawn(function()
-        while isUpgradeMasteryAll do 
-            for _, category in ipairs(categories) do
-                local args = { [1] = "UpgradeMastery", [2] = category }
-                game:GetService("ReplicatedStorage").Shared.Framework.Network.Remote.Event:FireServer(unpack(args))
-                task.wait(0.5)
+        local remote = ReplicatedStorage.Remotes:FindFirstChild("Redeem Code")
+        if remote then
+            for _, code in ipairs(codes) do
+                pcall(function()
+                    remote:InvokeServer(code)
+                    task.wait(0.5) -- add slight delay between codes
+                end)
             end
+        else
+            warn("Redeem Code remote not found!")
         end
-    end)
-end)
+    end
+})
 
+Tabs.Egg:AddSection("Hatching")
 --// Egg Amount Dropdown
 Tabs.Egg:AddDropdown("EggAmountDropdown", {
     Title = "Select Amount",
@@ -364,6 +577,7 @@ Tabs.Egg:AddDropdown("EggDropdown", {
 --// Auto Buy Egg Toggle
 Tabs.Egg:AddToggle("BuyEggToggle", {
     Title = "Buy Selected Egg",
+    Description = "Buys Selected Egg",
     Default = false
 }):OnChanged(function(state)
     BuysEgg = state
@@ -390,6 +604,8 @@ local teleportTargets = {
     ["The Void"] = "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
     ["Zen"] = "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
 }
+
+Tabs.Tp:AddSection("Teleport")
 
 -- Dropdown (teleports on selection if toggle is ON)
 Tabs.Tp:AddDropdown("Dropdown", {
@@ -424,10 +640,178 @@ Tabs.Tp:AddToggle("MyToggle", {
     end
 end)
 
+--// Function to Unlock All Islands
+local function unlockAllIslands()
+    local locations = {
+        "Workspace.Worlds.The Overworld.PortalSpawn",
+        "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
+        "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
+    }
 
+    for _, loc in ipairs(locations) do
+        ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", loc)
+        task.wait(0.1)
+    end
+end
+
+
+Tabs.Tp:AddSection("Rifts")
+
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(15, Enum.EasingStyle.Linear)
+
+local riftFolder = workspace.Rendered:WaitForChild("Rifts")
+
+-- Define the player, humanoid, and root part
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Function to get unique rift names
+local function getUniqueRiftNames()
+    local uniqueNames = {}
+    local riftNames = {}
+
+    for _, rift in ipairs(riftFolder:GetChildren()) do
+        if not uniqueNames[rift.Name] then
+            uniqueNames[rift.Name] = true
+            table.insert(riftNames, rift.Name)
+        end
+    end
+
+    return riftNames
+end
+
+-- Create initial dropdown
+local Dropdown = Tabs.Tp:AddDropdown("Dropdown", {
+    Title = "Select Rift",
+    Values = getUniqueRiftNames(),
+    Multi = false,
+    Default = nil,
+})
+
+-- Store the selected rift
+local selectedRift = nil
+local lastSelectedRift = nil
+local teleporting = false
+local currentTween = nil
+
+-- Update dropdown values
+local function refreshDropdown()
+    local newValues = getUniqueRiftNames()
+    Dropdown:SetValues(newValues)
+    
+    -- Optional: Reset selectedRift if it's no longer in the list
+    if not table.find(newValues, selectedRift) then
+        selectedRift = nil
+        Dropdown:SetValue(nil)
+    end
+end
+
+-- Handle dropdown changes
+Dropdown:OnChanged(function(Value)
+    selectedRift = Value
+    print("Selected Rift: " .. tostring(selectedRift))
+end)
+
+-- Watch for changes in the folder
+riftFolder.ChildAdded:Connect(refreshDropdown)
+riftFolder.ChildRemoved:Connect(refreshDropdown)
+
+local Toggle = Tabs.Tp:AddToggle("MyToggle", {
+    Title = "Teleport",
+    Description = "Auto Teleports you to selected rift",
+    Default = false
+})
+
+Toggle:OnChanged(function(state)
+    teleporting = state
+
+    if teleporting then
+        task.spawn(function()
+            while teleporting do
+                if selectedRift and selectedRift ~= lastSelectedRift then
+                    local riftModel = riftFolder:FindFirstChild(selectedRift)
+
+                    if riftModel and riftModel:IsA("Model") then
+                        local primary = riftModel.PrimaryPart or riftModel:FindFirstChild("PrimaryPart") or riftModel:FindFirstChildWhichIsA("BasePart")
+
+                        if primary then
+                            local offsetCFrame = primary.CFrame * CFrame.new(0, 5, -5)
+                            local targetPosition = offsetCFrame.Position
+
+                            -- Cancel the previous tween if it exists
+                            if currentTween then
+                                currentTween:Cancel()
+                            end
+
+                            -- Create the new tween for teleporting to the new rift
+                            local goal = { CFrame = offsetCFrame }
+                            currentTween = TweenService:Create(rootPart, tweenInfo, goal)
+                            currentTween:Play()
+
+                            -- Monitor the tween completion
+                            currentTween.Completed:Connect(function(status)
+                                if status == Enum.PlaybackState.Completed then
+                                    -- Reset humanoid state after reaching destination
+                                    humanoid:ChangeState(Enum.HumanoidStateType.Seated)
+                                    task.wait(0.1)
+                                    humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                                end
+                            end)
+
+                            -- Update last selected rift to prevent re-teleporting until it's completed
+                            lastSelectedRift = selectedRift
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+
+Tabs.Tp:AddSection("Others")
+
+Tabs.Tp:AddButton({
+        Title = "Unlock All Areas",
+        Description = "Unlock All Areas if dont work use tween",
+        Callback = function()
+            unlockAllIslands()
+end})
+
+Tabs.Tp:AddButton({
+    Title = "Tween To Unlock All Areas",
+    Description = "Tween to all areas",
+    Callback = function()
+        local startCFrame = char:GetPivot()
+        local endCFrame = CFrame.new(36.297184, 15971.6924, 41.8721046)
+        local cframeValue = Instance.new("CFrameValue")
+        cframeValue.Value = startCFrame
+        local tween = TweenService:Create(cframeValue, tweenInfo, {Value = endCFrame})
+        cframeValue:GetPropertyChangedSignal("Value"):Connect(function()
+            char:PivotTo(cframeValue.Value)
+        end)
+
+        tween:Play()
+    end
+})
+
+
+
+
+--// Merchants eli niiten shopit 
+
+
+Tabs.Player:AddSection("Player")
 
 --// PLAYER SETTINGS!
-local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Anti-AFK", Default = false})
+local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Anti-AFK", Description = "Auto Afk", Default = false})
 
 -- Function to enable AFK
 local function enableAFK()
@@ -445,34 +829,19 @@ Toggle:OnChanged(function(value)
     end
 end)
 
-
 Tabs.Player:AddButton({
-    Title = "Redeem Codes",
-    Description = "Redeem Codes to get items!",
+    Title = "Rejoin",
+    Description = "Rejoin the same server",
     Callback = function()
-        local codes = {
-            "Thanks",
-            "Lucky",
-            "RELEASE",
-        }
-
-        local remote = ReplicatedStorage.Remotes:FindFirstChild("Redeem Code")
-        if remote then
-            for _, code in ipairs(codes) do
-                pcall(function()
-                    remote:InvokeServer(code)
-                    task.wait(0.5) -- add slight delay between codes
-                end)
-            end
-        else
-            warn("Redeem Code remote not found!")
-        end
+        game:GetService("TeleportService"):Teleport(game.PlaceId, game:GetService("Players").LocalPlayer) 
     end
 })
 
+Tabs.Player:AddSection("Music")
 
 local Input = Tabs.Player:AddInput("Input", {
-Title = "Input Audio", 
+Title = "Input Audio",
+Description = "Put ID to listen Music",
 Default = "rbxassetid://142376088", 
 Placeholder = "rbxassetid://ID",
 Numeric = false, Finished = false})
@@ -482,12 +851,12 @@ end)
 
 
 
-local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Loop Audio", Default = false })
+local Toggle = Tabs.Player:AddToggle("MyToggle", {Title = "Loop Audio", Description = "Loops Audio", Default = false })
 Toggle:OnChanged(function(Value)
     _G.AudioLooped = Value
 end)
 
-local Slider = Tabs.Player:AddSlider("Slider", {Title = "Volume Audio", Description = "", Default = 10, Min = 0, Max = 20, Rounding = 1})
+local Slider = Tabs.Player:AddSlider("Slider", {Title = "Volume Audio", Description = "How Loud do you want it to be?", Default = 10, Min = 0, Max = 20, Rounding = 1})
 Slider:OnChanged(function(Value)
     _G.AudioVolume = Value
 end)
@@ -496,7 +865,7 @@ local currentlyPlayingSound = nil
 
 Tabs.Player:AddButton({
     Title = "Play Audio",
-    Description = "",
+    Description = "Play Audio",
     Callback = function()
         -- Stop current sound if playing
         if currentlyPlayingSound and currentlyPlayingSound:IsDescendantOf(workspace) then
@@ -533,7 +902,7 @@ Tabs.Player:AddButton({
 
 Tabs.Player:AddButton({
     Title = "Stop Audio",
-    Description = "",
+    Description = "Stops Audio",
     Callback = function()
         if currentlyPlayingSound and currentlyPlayingSound:IsDescendantOf(workspace) then
             currentlyPlayingSound:Stop()
@@ -568,6 +937,11 @@ Tabs.Creds:AddButton({
 
 --// UPDATES
 Tabs.Update:AddParagraph({
+    Title = "Welcome!",
+    Content = "Thank You For Using DarkBaconHub we are really happy that you use our script\nIf Something Wrong with my script please let me know!"
+})
+
+Tabs.Update:AddParagraph({
     Title = "Release!",
     Content = "[+] Auto Bubble\n[+] Auto sell\n[+] Auto collect drops\n[+] Auto playtime rewards\n[+] Auto Chest\n\n\n[+] & More!\nHey, Join my Discord: https://discord.gg/9zX8dT4DDh for more updates!"
 })
@@ -577,29 +951,19 @@ Tabs.Update:AddParagraph({
     Content = "[+] Added Instant Collect Coins/Gems\n[+] Fixed No More Spam Music\n[+] Fixed Teleport\n[+] Added Auto ClaimSeason\n[+] Fixed CollectPickup and delete it\n[+] Added Auto Mastery\n[+] Added AntiAfk in player tab\n[-] Removed Jump Power\n[-] Removed Fov\n[+] Imporved Auto Collect\n[+] Fixed Auto Sell[must be near the sell]\n[+] Fixed Auto Collect\n\nif is bugs REPORT TO DISCORD!"
 })
 
+Tabs.Update:AddParagraph({
+    Title = "Update!",
+    Content = "HUGE Update\n[+] Added Tweens & more\nSell method\nCollect Method\nBetter functions\nFixed UI\nAnd more check it out\n Join discord server!!!!"
+})
+
+Tabs.Update:AddParagraph({
+    Title = "Possible Soon Updates",
+    Content = "Adding Enchants\nAdding Target Rifts\nStorage Full Sell\nShops Note: i will maybe add them!"
+})
+
 
 --// Open Main Tab on Start
 Window:SelectTab(1)
-
---// Function to Unlock All Islands
-local function unlockAllIslands()
-    local locations = {
-        "Workspace.Worlds.The Overworld.PortalSpawn",
-        "Workspace.Worlds.The Overworld.Islands.Floating Island.Island.Portal.Spawn",
-        "Workspace.Worlds.The Overworld.Islands.Outer Space.Island.Portal.Spawn",
-        "Workspace.Worlds.The Overworld.Islands.Twilight.Island.Portal.Spawn",
-        "Workspace.Worlds.The Overworld.Islands.The Void.Island.Portal.Spawn",
-        "Workspace.Worlds.The Overworld.Islands.Zen.Island.Portal.Spawn"
-    }
-
-    for _, loc in ipairs(locations) do
-        ReplicatedStorage.Shared.Framework.Network.Remote.Event:FireServer("Teleport", loc)
-        task.wait(0.1)
-    end
-end
-
--- Call function once at script start
-unlockAllIslands()
 
 --//-//--//-// GUI 
 local ScreenGui = Instance.new("ScreenGui")
