@@ -3,7 +3,7 @@ local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/
 local Player = game.Players.LocalPlayer
 
 -- Key system setup
-getgenv().Key = "OLenHjim"  -- Your key here
+getgenv().Key = "Nekrut"  -- Your key here
 getgenv().KeyInput = "" -- User input
 local keyFile = "darkbacon_key.txt"
 local keyDuration = 8640000 -- 100 days in seconds
